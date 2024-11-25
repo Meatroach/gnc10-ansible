@@ -1,0 +1,121 @@
+---
+- name: Install OpenJRE, Cockpit, configure NetworkManager, set up Java application service, Avahi, and install TeamViewer
+  hosts: all
+  become: true  # Ensure that this playbook runs with root privileges
+  tasks:
+
+    # Task 1: Update apt cache
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600  # Cache is considered valid for 1 hour
+
+    # Task 2: Install OpenJDK (JRE)
+    - name: Install OpenJDK (JRE)
+      apt:
+        name: openjdk-11-jre  # You can change the version if needed
+        state: present
+
+    # Task 3: Install Cockpit
+    - name: Install Cockpit
+      apt:
+        name: cockpit
+        state: present
+
+    # Task 4: Enable and start Cockpit
+    - name: Enable and start Cockpit service
+      systemd:
+        name: cockpit
+        enabled: yes
+        state: started
+
+    # Task 5: Ensure NetworkManager is installed
+    - name: Install NetworkManager
+      apt:
+        name: network-manager
+        state: present
+
+    # Task 6: Configure network stack to use NetworkManager
+    - name: Set network stack to use NetworkManager
+      blockinfile:
+        path: /etc/netplan/01-netcfg.yaml
+        create: yes
+        block: |
+          network:
+            version: 2
+            renderer: NetworkManager
+      notify: Apply Netplan Changes
+
+    # Task 7: Apply netplan changes to switch to NetworkManager
+    - name: Apply Netplan Changes
+      command: netplan apply
+      when: renderer == "NetworkManager"
+
+    # Task 8: Download Java application
+    - name: Download Java application
+      get_url:
+        url: "https://office.gastronovi.com/gn_server.jar"
+        dest: /opt/gn_server/gn_server.jar
+        mode: '0755'  # Set permissions if needed
+
+    # Task 9: Create a systemd service for the Java application
+    - name: Create systemd service for the Java application
+      copy:
+        dest: /etc/systemd/system/gn_server.service
+        content: |
+          [Unit]
+          Description=Java Application Service
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/bin/java -jar /opt/gn_server/gn_server.jar
+          WorkingDirectory=/opt/gn_server
+          Restart=always
+          User=nobody
+          Environment=JAVA_OPTS=-Xmx2048m
+          
+          [Install]
+          WantedBy=multi-user.target
+
+    # Task 10: Reload systemd to apply the new service
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    # Task 11: Enable and start the Java application service
+    - name: Enable and start Java application service
+      systemd:
+        name: gn_server
+        enabled: yes
+        state: started
+
+    # Task 12: Install Avahi (for .local domain access)
+    - name: Install Avahi daemon
+      apt:
+        name: avahi-daemon
+        state: present
+
+    # Task 13: Configure Avahi hostname to 'controller'
+    - name: Set Avahi hostname to 'gncontroller'
+      lineinfile:
+        path: /etc/avahi/avahi-daemon.conf
+        regexp: '^#?host-name='
+        line: 'host-name=gncontroller'
+
+    # Task 14: Ensure Avahi is started and enabled at boot
+    - name: Enable and start Avahi daemon
+      systemd:
+        name: avahi-daemon
+        enabled: yes
+        state: started
+
+    # Task 15: Set system hostname to 'gncontroller'
+    - name: Set system hostname
+      hostname:
+        name: controller
+        use: systemd
+
+
+
+  handlers:
+    - name: Apply Netplan Changes
+      command: netplan apply
