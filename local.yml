@@ -10,11 +10,17 @@
         update_cache: yes
         cache_valid_time: 3600  # Cache is considered valid for 1 hour
 
-    # Task 2: Install OpenJDK (JRE)
-    - name: Install OpenJDK (JRE)
-      apt:
-        name: openjdk-11-jre  # You can change the version if needed
-        state: present
+- name: Install OpenJDK (JRE)
+  apt:
+    name: "{{ java_package }}"
+    state: present
+  vars:
+    java_package: >-
+      {% if ansible_distribution == 'Debian' %}
+        default-jre
+      {% else %}
+        openjdk-11-jre
+      {% endif %}
 
     # Task 3: Install Cockpit
     - name: Install Cockpit
