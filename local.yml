@@ -46,7 +46,12 @@
             renderer: NetworkManager
       notify: Apply Netplan Changes
 
-
+   # Task 7: Ensure the destination directory exists
+    - name: Create destination directory
+      file:
+        path: /opt/gn_server
+        state: directory
+        mode: '0755'
 
     # Task 8: Download Java application
     - name: Download Java application
